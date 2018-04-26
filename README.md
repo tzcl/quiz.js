@@ -1,2 +1,2 @@
 # quiz.js
-Javascript quiz library
+Simple Javascript quiz library.
