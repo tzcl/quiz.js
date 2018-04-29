@@ -2,134 +2,164 @@
 // var Quiz = (function() {  
 // })();
 
-function Response(text, tag, classes) {
+function Response(text, classes) {
     // TODO make this abstract
 
     this.text = text;
-    this.tag = tag;
     this.classes = classes;
 }
 
-function TextResponse(text, tag, type, classes) {
-    Response.call(this, text, tag, classes);
+function TextResponse(text, classes = "", type = "text") {
+    Response.call(this, text, classes);
     this.placeholder = text;
     this.type = type;
 }
 
-function ButtonResponse(text, tag, classes) {
-    Response.call(this, text, tag, classes);
+function ButtonResponse(text, classes = "") {
+    Response.call(this, text, classes);
 }
 
 function Question(text, responses) {
     this.text = text;
     this.responses = responses;
+
     this.answer = {};
+    this.keys = 0;
 }
 
 Question.prototype = {
     init: function(quiz) {
 	throw new Error("You have to implement init()!");
-    }, 
-    getAnswer: function() {
+    },
+    writeAnswer: function() {
 	throw new Error("You have to implement getResponse()");
     },
 };
 
-function TextQuestion(text, responses) {
+function TextQuestion(text, responses = []) {
     Question.call(this, text, responses);
 }
 
 TextQuestion.prototype = {
     init: function(quiz) {
 	// clear form
-	$("#buttons").html("");
+	$("#quiz #buttons").html("");
 
-	$("#question").html(this.text);
+	$("#quiz #question").html(this.text);
 
 	var html = "";
 	for(var i = 0; i < this.responses.length; i++) {
 	    html += "<input type='" + this.responses[i].type + "' id='textbox" + i + "' placeholder='" + this.responses[i].placeholder + "' class='" + this.responses[i].classes + "'></input><br>";
 	}
-	$("#textboxes").html(html);
+	$("#quiz #textboxes").html(html);
 
 	// validation
-	$("input").on("input", function() {
+	$("#quiz input").on("input", function() {
 	    var empty = false;
-	    $("input").each(function() {
+	    $("#quiz input").each(function() {
 		if($(this).val() === "") empty = true;
 	    });
 
-	    $("#next").prop("disabled", empty);
+	    $("#quiz #next").prop("disabled", empty);
 	});
     },
-    getAnswer: function() {
-	// TODO implement
+    add: function(...args) {
+	for(var i = 0; i < args.length; i++) {
+	    this.responses.push(args[i]);
+	}
+    },
+    writeAnswer: function() {
+	for(var i = 0; i < this.responses.length; i++) {
+	    this.answer[this.responses[i].text] = $("#quiz #textbox" + i).val();
+	    this.keys++;
+	}
     }
 };
 
-function ButtonQuestion(text, responses, min_answers, need_to_confirm) {
+function ButtonQuestion(text, need_to_confirm = true, min_answers = 1, responses = []) {
     Question.call(this, text, responses);
 
-    if(min_answers < 1) min_answers = 1;
-    this.min_answers = min_answers;
+    if(min_answers !== 1) need_to_confirm = true;
     
-    if(min_answers > 1) this.need_to_confirm = true;
-    else this.need_to_confirm = need_to_confirm;
+    this.min_answers = min_answers;
+    this.need_to_confirm = need_to_confirm;
 }
 
 ButtonQuestion.prototype = {
     init: function(quiz) {
 	// clear form
-	$("#textboxes").html("");
+	$("#quiz #textboxes").html("");
 
-	$("#question").html(this.text);
+	$("#quiz #question").html(this.text);
 
 	var html = ""
 	for(var i = 0; i < this.responses.length; i++) {
-	    html += "<button class='input_button " + this.responses[i].classes + "'><span id=choice" + i + ">" + this.responses[i].text + "</span></button>";	    
+	    html += "<button class='" + this.responses[i].classes + "'><span id=choice" + i + ">" + this.responses[i].text + "</span></button>";	    
 	}
-	$("#buttons").html(html);
+	$("#quiz #buttons").html(html);
 
 	var question = this;
 	
 	if(this.need_to_confirm) {
-	    $("#next").removeClass("hidden");
-	    $("button").on("click", function() {
-		console.log($(this).attr('id'));
+	    $("#quiz #next").removeClass("hidden");
+	    $("#quiz #next").prop("disabled", $("#quiz .active").length < question.min_answers);
+	    
+	    $("#quiz button").not("#next").on("click touch", function() {
 		$(this).toggleClass("active");
-		$("#next").prop("disabled", $(".active").length < question.min_answers);
+		$("#quiz #next").prop("disabled", $("#quiz .active").length < question.min_answers);
 	    });
 	} else {
-	    $("#next").addClass("hidden");
+	    $("#quiz #next").addClass("hidden");
 
-	    $("button").on("click", function() {
-		// TODO next question
-		// need to handle answers
+	    var instance = this;
+	    
+	    $("#quiz button").not("#next").on("click touch", function() {
+		var id = $(this).children(0).attr("id")["choice".length];
+		instance.answer[instance.text] = instance.responses[id].text;
+		instance.keys = 1;
+		
 		quiz.nextQuestion();
 	    });
 	}
 	
     },
-    getAnswer: function() {
-	// TODO implement
+    add: function(...args) {
+	for(var i = 0; i < args.length; i++) {
+	    this.responses.push(args[i]);
+	}
+    },
+    writeAnswer: function() {
+	var first = true;
+	var instance = this;
+	$("#quiz .active").each(function() {
+	    var id = $(this).children(0).attr("id")["choice".length];
+	    if(first) {
+		instance.answer[instance.text] = instance.responses[id].text;
+		first = false;
+	    } else {
+		instance.answer[instance.text] += ", " + instance.responses[id].text;
+	    }
+	});
+	this.keys = 1;
     }
 };
 
-function Quiz() {
+function Quiz(title = "", submit_text = "Get in touch!", final_message = "<h2>Thanks for doing the quiz!</h2>") {
     this.index = 0;
     this.questions = [];
-    this.submit_text = "Get in touch!";
-    this.final_message = "<h2>Thanks for doing the quiz!</h2>";
+    this.title = title;
+    this.submit_text = submit_text;
+    this.final_message = final_message;
 
-     var html = "<h1>Lead Quiz</h1> \
+     var html = "<div id='title'>" + title + "</div> \
 <hr style='margin-top: 20px'> \
-<p id='question'></p> \
+<div id='progress'></div> \
+<center><div id='to_clear'><p id='question'></p> \
 <div id='buttons'></div> \
-<form id='textboxes'></form> \
+<form id='textboxes'></form></div></center> \
 <hr style='margin-top: 50px'> \
-<footer> \
-<p id='progress'>Question x of y.</p> \
-<button id='next'>Next</button> \
+<footer id='quiz_footer'> \
+<button id='next' class='button'>Next</button> \
 </footer>";
 
     $("#quiz").html(html);
@@ -138,7 +168,6 @@ function Quiz() {
 Quiz.prototype = {
     add: function(...args) {
 	for(var i = 0; i < args.length; i++) {
-	    if(args[i] === null) console.log("fken null why");
 	    this.questions.push(args[i]);
 	}
     },
@@ -146,8 +175,13 @@ Quiz.prototype = {
 	throw new Error("You have to implement a response handler for the quiz!");
     },
     start: function() {
+	var html = "<span class='step'></span>";
+	for(var i = 0; i < this.questions.length; i++) {
+	    $("#quiz #progress").html($("#quiz #progress").html() + html);
+	}
+	
 	var instance = this;
-	$("#next").on("click", function() {
+	$("#quiz #next").on("click touch", function() {
 	    instance.nextQuestion();   
 	});
 	// enter = next
@@ -168,32 +202,69 @@ Quiz.prototype = {
     finished: function() {
 	return this.index === this.questions.length;
     },
-    set: function(submit_text = "Get in touch!", final_message = "<h2>Thanks for doing the quiz!</h2>") {
-	this.submit_text = submit_text;
-	this.final_message = final_message;
-    },
     getQuestion: function() {
 	return this.questions[this.index];
     },
     loadQuestion: function() {
-	$("#next").prop("disabled", true);
+	$("#quiz #next").prop("disabled", true);
 	if(this.finished()) {
+	    this.handleResponses();
 	    this.clearQuiz();
 	} else {
 	    if(this.index === this.questions.length - 1) {
-		$("#next").html(this.submit_text);
+		$("#quiz #next").html(this.submit_text);
 	    }
 	    var question = this.getQuestion();
 	    question.init(this);
-	    // TODO updateProgress();
+	    this.updateProgress();
 	}
     },
     nextQuestion: function() {
-	// handle responses
+	var question = this.getQuestion();
+	question.writeAnswer();
+	$("#quiz .step:eq(" + this.index + ")").addClass("finished");
+	
 	this.index++;
 	this.loadQuestion();
     },
-    clearQuiz: function() {
-	$("#quiz").html(this.final_message);
+    updateProgress: function() {
+	$("#quiz .step").removeClass("current");
+	$("#quiz .step:eq(" + this.index  + ")").addClass("current");
     },
+    clearQuiz: function() {
+	$("#quiz .step").removeClass("current");
+	var html = "<p>" + this.final_message + "</p>";
+	$("#quiz #to_clear").html(html);
+	$("#quiz #quiz_footer").html("");
+    },
+}
+
+var emailResponses = function(_name, _email, _subject, _message, done = function(response) { console.log(response) }, fail = function(data) {}) {
+    $(function() {
+	var _data = {
+	    name: _name,
+	    email: _email,
+	    subject: _subject,
+	    message: _message,
+	};
+
+	$.ajax({
+	    type: 'POST',
+	    url: 'email.php',
+	    data: _data,
+	})
+	    .done(function(response) {
+		// success
+		done(response);
+	    })
+	    .fail(function(data) {
+		// error!
+		if(data.responseText !== '') {
+		    console.log(data.responseText);
+		} else {
+		    console.log("Oops! An error occurred and your message could not be sent.");
+		}
+		fail(data);
+	    });
+    });
 }

@@ -1,0 +1,29 @@
+#quiz .hidden {
+    visibility: hidden;
+}
+
+#quiz #progress {
+    text-align:center;
+    margin-top:40px;
+    color: #2b2b2b;
+    font-size: 18px;
+}
+
+#quiz .step {
+    height: 15px;
+    width: 15px;
+    margin: 0 2px;
+    background-color: #bbbbbb;
+    border: none; 
+    border-radius: 50%;
+    display: inline-block;
+    opacity: 0.5;
+}
+
+#quiz .step.current {
+    opacity: 1;
+}
+
+#quiz .step.finished {
+    background-color: #4CAF50;
+}
